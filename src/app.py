@@ -77,7 +77,7 @@ def send_email(email_content, district_name):
     if not email_content:
         body = "No new slots found for " + district_name
         print(body)
-        # return
+        return
 
     print("Email body: ", body)
     email_address = os.environ.get('EMAIL_USER')
