@@ -2,6 +2,7 @@ from email.mime.text import MIMEText
 
 import requests
 import datetime
+import pytz
 import time
 import smtplib
 import os
@@ -22,8 +23,8 @@ districts = [
         "district_name": "Palghar"
     },
 ]
-
-now = datetime.datetime.now()
+IST = pytz.timezone('Asia/Kolkata')
+now = datetime.datetime.now(IST)
 START_DATE = "{}-{}-{}".format(now.day, now.month, now.year)
 headers = {
     "Accept": "application/json",
@@ -89,7 +90,7 @@ def send_email(email_content, district_name):
     smtpserver.login(email_address, password)
 
     mailing_list = [e for e in os.environ.get('MAILING_LIST').split(",") if e]
-    subject = "New slots for {} - {}".format(district_name, datetime.datetime.now().strftime("%d-%m-%Y, %H:%M"))
+    subject = "New slots for {} - {}".format(district_name, datetime.datetime.now(IST).strftime("%d-%m-%Y, %H:%M"))
     if not email_content:
         subject = "No slots found for {}".format(district_name)
     msg = MIMEText(body)
