@@ -6,7 +6,7 @@ import time
 import smtplib
 import os
 
-SECONDS_TO_SLEEP = 1800  # 30 minutes
+SECONDS_TO_SLEEP = 90  # 1.5 minutes
 
 state = {
     "state_id": 21,
@@ -75,7 +75,9 @@ def send_email(email_content, district_name):
             ec.get("date"))
         body += text
     if not email_content:
-        body = "No new slots found for " + district_name
+        print("No new slots found for " + district_name)
+        return
+
     print("Email body: ", body)
     email_address = os.environ.get('EMAIL_USER')
     password = os.environ.get('EMAIL_PASSWORD')
@@ -106,5 +108,5 @@ if __name__ == "__main__":
             print("New search for " + district.get("district_name"))
             processed_data = parse_data(request(district.get("district_id")))
             send_email(processed_data, district.get("district_name"))
-            time.sleep(5)  # Sleep for 2 minutes between calls
+            time.sleep(15)  # Sleep for 15 seconds between calls
         time.sleep(SECONDS_TO_SLEEP)
