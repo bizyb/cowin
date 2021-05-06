@@ -1,0 +1,11 @@
+version: "3.3"
+services:
+  cowin:
+    build: .
+    container_name: cowin_bot
+    restart: always
+    environment:
+      - EMAIL_USER
+      - EMAIL_PASSWORD
+      - MAILING_LIST
+

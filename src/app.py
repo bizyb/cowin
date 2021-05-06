@@ -1,3 +1,5 @@
+from email.mime.text import MIMEText
+
 import requests
 import datetime
 import time
@@ -7,32 +9,39 @@ import os
 SECONDS_TO_SLEEP = 1800  # 30 minutes
 
 state = {
-            "state_id": 21,
-            "state_name": "Maharashtra"
-        }
-district = {
-                "district_id": 394,
-                "district_name": "Palghar"
-            }
+    "state_id": 21,
+    "state_name": "Maharashtra"
+}
+districts = [
+    {
+        "district_id": 395,
+        "district_name": "Mumbai"
+    },
+    {
+        "district_id": 394,
+        "district_name": "Palghar"
+    },
+]
+
 now = datetime.datetime.now()
-START_DATE = "{}-{}-{}".format(now.day, now.month, now.year)
+START_DATE = "{}-{}-{}".format(7, now.month, now.year)
 headers = {
     "Accept": "application/json",
     "Accept-Language": "en_US",
-    "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36"
 }
-params = {
-    "district_id": 394,
-    "date": START_DATE
-}
+
 url = "https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/findByDistrict"
 
 
-def request():
+def request(district_id):
+    params = {
+        "district_id": district_id,
+        "date": START_DATE
+    }
     session = requests.Session()
     session.headers.update(headers)
     response = session.get(url, params=params)
-    print(response.json())
     return response.json()
 
 
@@ -55,10 +64,8 @@ def parse_data(json_data):
     return data_to_email
 
 
-def send_email(email_content):
+def send_email(email_content, district_name):
     body = ""
-    if not email_content:
-        body = "No slots found"
     for ec in email_content:
         slots = "\n".join(["\t" + slot for slot in ec.get("slots")])
         text = "Location: {}\nCost: {}\nNumber of Slots: {}\nDate: {}\n\n".format(
@@ -67,31 +74,37 @@ def send_email(email_content):
             ec.get("num_slots"),
             ec.get("date"))
         body += text
-    print("About to send email...")
+    if not email_content:
+        body = "No new slots found for " + district_name
     print("Email body: ", body)
-    gmail_user = os.environ.get('EMAIL_USER')
-    gmail_pwd = os.environ.get('EMAIL_PASSWORD')
+    email_address = os.environ.get('EMAIL_USER')
+    password = os.environ.get('EMAIL_PASSWORD')
     smtpserver = smtplib.SMTP("smtp.gmail.com", 587)
     smtpserver.ehlo()
     smtpserver.starttls()
     smtpserver.ehlo
-    smtpserver.login(gmail_user, gmail_pwd)
+    smtpserver.login(email_address, password)
+
     mailing_list = [e for e in os.environ.get('MAILING_LIST').split(",") if e]
+    subject = "New slots for {} - {}".format(district_name, datetime.datetime.now().strftime("%d-%m-%Y, %H:%M"))
+    if not email_content:
+        subject = "No slots found for {}".format(district_name)
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = "CoWIN Vaccination Alert <{}>".format(email_address)
     for to in mailing_list:
-        tag = datetime.datetime.now().strftime("%d-%m-%Y, %H:%M:%S")
-        if not email_content:
-            tag = "--No slots found--"
-        header = 'To:' + to + '\n' + 'From: ' + gmail_user + '\n' + 'Subject:CoWIN Vaccination Slots {}\n'\
-            .format(tag)
-        print(header)
-        msg = header + '\n {} \n\n'.format(body)
-        smtpserver.sendmail(gmail_user, to, msg)
+        msg['To'] = to
+        smtpserver.sendmail(email_address, to, msg.as_string())
         print("Email sent to " + to)
     smtpserver.close()
+    print("Done")
 
 
 if __name__ == "__main__":
     while True:
-        processed_data = parse_data(request())
-        send_email(processed_data)
+        for district in districts:
+            print("New search for " + district.get("district_name"))
+            processed_data = parse_data(request(district.get("district_id")))
+            send_email(processed_data, district.get("district_name"))
+            time.sleep(5)  # Sleep for 2 minutes between calls
         time.sleep(SECONDS_TO_SLEEP)
