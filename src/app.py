@@ -6,7 +6,7 @@ import time
 import smtplib
 import os
 
-SECONDS_TO_SLEEP = 90  # 1.5 minutes
+SECONDS_TO_SLEEP = 900  # 15 minutes
 
 state = {
     "state_id": 21,
@@ -24,7 +24,7 @@ districts = [
 ]
 
 now = datetime.datetime.now()
-START_DATE = "{}-{}-{}".format(7, now.month, now.year)
+START_DATE = "{}-{}-{}".format(now.day, now.month, now.year)
 headers = {
     "Accept": "application/json",
     "Accept-Language": "en_US",
@@ -75,8 +75,9 @@ def send_email(email_content, district_name):
             ec.get("date"))
         body += text
     if not email_content:
-        print("No new slots found for " + district_name)
-        return
+        body = "No new slots found for " + district_name
+        print(body)
+        # return
 
     print("Email body: ", body)
     email_address = os.environ.get('EMAIL_USER')
