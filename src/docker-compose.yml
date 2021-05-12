@@ -5,9 +5,7 @@ services:
     container_name: cowin_bot
     restart: always
     environment:
-      - EMAIL_USER
-      - EMAIL_PASSWORD
-      - MAILING_LIST
+      - PYTHONUNBUFFERED=1
       - TWITTER_API_CONSUMER_KEY
       - TWITTER_API_CONSUMER_SECRET
       - TWITTER_API_ACCESS_TOKEN
