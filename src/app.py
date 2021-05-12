@@ -6,6 +6,18 @@ import pytz
 import time
 import smtplib
 import os
+import tweepy
+from tweepy import TweepError
+
+CONTENT_THRESHOLD = 500
+# Keep up to 500 entries in memory
+in_mem_db = {}
+in_mem_db_list = []
+
+TWITTER_API_CONSUMER_KEY = os.environ.get('TWITTER_API_CONSUMER_KEY')
+TWITTER_API_CONSUMER_SECRET = os.environ.get('TWITTER_API_CONSUMER_SECRET')
+TWITTER_API_ACCESS_TOKEN = os.environ.get('TWITTER_API_ACCESS_TOKEN')
+TWITTER_API_ACCESS_TOKEN_SECRET = os.environ.get('TWITTER_API_ACCESS_TOKEN_SECRET')
 
 SECONDS_TO_SLEEP = 900  # 15 minutes
 
@@ -43,7 +55,11 @@ def request(district_id):
     session = requests.Session()
     session.headers.update(headers)
     response = session.get(url, params=params)
-    return response.json()
+    try:
+        return response.json()
+    except Exception as e:
+        print(e)
+        return {}
 
 
 def parse_data(json_data):
@@ -56,13 +72,61 @@ def parse_data(json_data):
                     "location": "{}, {}, {}".format(r.get("name"), r.get("block_name"), r.get("district_name")),
                     "date": r.get("date"),
                     "cost": r.get("fee"),
-                    "slots": r.get("slots"),
+                    "slots": "\n" + "\n".join(["\t" + s for s in r.get("slots")]),
                     "num_slots": r.get("available_capacity")
                 }
                 data_to_email.append(row)
     except Exception as e:
         print(e)
     return data_to_email
+
+
+def update_db(content_hash):
+    # Do not tweet if content already in db
+    if content_hash in in_mem_db:
+        return False
+
+    if len(in_mem_db) == CONTENT_THRESHOLD:
+        value_to_delete = None
+        if len(in_mem_db_list) > 0:
+            value_to_delete = in_mem_db_list[0]
+            del in_mem_db_list[0]
+        if value_to_delete:
+            del in_mem_db[value_to_delete]
+
+    in_mem_db[content_hash] = True
+    in_mem_db_list.append(content_hash)
+    return True
+
+
+def tweet(content, district_name):
+    auth = tweepy.OAuthHandler(TWITTER_API_CONSUMER_KEY, TWITTER_API_CONSUMER_SECRET)
+    auth.set_access_token(TWITTER_API_ACCESS_TOKEN, TWITTER_API_ACCESS_TOKEN_SECRET)
+    api = tweepy.API(auth)
+
+    for c in content:
+        location = c.get("location").replace("\n", "")
+        cost = c.get("cost")
+        num_slots = c.get("num_slots")
+        date = c.get("date")
+        time_window = c.get('slots')
+        content_hash = hash("{}-{}-{}-{}-{}-{}".format(location, cost, num_slots, date, district_name, time_window))
+        do_tweet = update_db(content_hash)
+        if do_tweet:
+            status = "New vaccination slots for the {} district\n\nLocation: {}\nDate: {}\nNumber of Slots: {}\nCost: {}\n{}".format(
+                district_name,
+                location,
+                date,
+                num_slots,
+                cost,
+                time_window,
+            )
+            try:
+                api.update_status(status)
+            except TweepError as e:
+                print(e)
+            print("New tweet: ", status)
+            time.sleep(5)  # Sleep for 5 seconds between tweets
 
 
 def send_email(email_content, district_name):
@@ -109,6 +173,6 @@ if __name__ == "__main__":
         for district in districts:
             print("New search for " + district.get("district_name"))
             processed_data = parse_data(request(district.get("district_id")))
-            send_email(processed_data, district.get("district_name"))
+            tweet(processed_data, district.get("district_name"))
             time.sleep(15)  # Sleep for 15 seconds between calls
         time.sleep(SECONDS_TO_SLEEP)
