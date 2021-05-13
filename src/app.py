@@ -19,7 +19,7 @@ TWITTER_API_CONSUMER_SECRET = os.environ.get('TWITTER_API_CONSUMER_SECRET')
 TWITTER_API_ACCESS_TOKEN = os.environ.get('TWITTER_API_ACCESS_TOKEN')
 TWITTER_API_ACCESS_TOKEN_SECRET = os.environ.get('TWITTER_API_ACCESS_TOKEN_SECRET')
 
-SECONDS_TO_SLEEP = 900  # 15 minutes
+SECONDS_TO_SLEEP = 300  # 5 minutes
 
 state = {
     "state_id": 21,
@@ -58,7 +58,7 @@ def request(district_id):
     try:
         return response.json()
     except Exception as e:
-        print(e)
+        print("response.json() has no data: ", e)
         return {}
 
 
@@ -77,7 +77,7 @@ def parse_data(json_data):
                 }
                 data_to_email.append(row)
     except Exception as e:
-        print(e)
+        print("Unable to parse response: ", e)
     return data_to_email
 
 
@@ -124,7 +124,7 @@ def tweet(content, district_name):
             try:
                 api.update_status(status)
             except TweepError as e:
-                print(e)
+                print("Tweepy error: ", e)
             print("New tweet: ", status)
             time.sleep(5)  # Sleep for 5 seconds between tweets
 
@@ -173,6 +173,12 @@ if __name__ == "__main__":
         for district in districts:
             print("New search for " + district.get("district_name"))
             processed_data = parse_data(request(district.get("district_id")))
-            tweet(processed_data, district.get("district_name"))
+            if processed_data:
+                print("Attempting to tweet processed data")
+                tweet(processed_data, district.get("district_name"))
+            else:
+                print("No data to tweet")
+            print("Sleeping for 15 seconds between districts")
             time.sleep(15)  # Sleep for 15 seconds between calls
+        print("Sleeping for {} minutes between searches".format(SECONDS_TO_SLEEP/60))
         time.sleep(SECONDS_TO_SLEEP)
